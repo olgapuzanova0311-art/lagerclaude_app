@@ -1,0 +1,484 @@
+<!DOCTYPE html>
+<html lang="ru">
+<head>
+<meta charset="UTF-8">
+<meta name="viewport" content="width=device-width, initial-scale=1.0, viewport-fit=cover">
+<title>Лагерь по Claude</title>
+<script src="https://telegram.org/js/telegram-web-app.js"></script>
+<style>
+  :root{
+    --bg: #F6F1E4;
+    --surface: #FFFEFA;
+    --ink: #262019;
+    --ink-soft: #7A6F5E;
+    --forest: #2F4B3C;
+    --forest-dark: #1C2E25;
+    --amber: #E0932E;
+    --mustard: #D9A441;
+    --line: #E7DFCC;
+    --danger: #B85C4A;
+    --safe-top: env(safe-area-inset-top, 0px);
+    --safe-bottom: env(safe-area-inset-bottom, 0px);
+  }
+
+  *{box-sizing:border-box; -webkit-tap-highlight-color: transparent;}
+
+  html, body{
+    margin:0; padding:0; height:100%;
+    background: var(--bg);
+    color: var(--ink);
+    font-family: -apple-system, "Segoe UI", Roboto, "Helvetica Neue", Arial, sans-serif;
+    overflow-x:hidden;
+  }
+
+  #app{ min-height:100%; padding-top: calc(var(--safe-top) + 4px); padding-bottom: calc(var(--safe-bottom) + 32px); }
+
+  .topbar{ display:flex; align-items:center; gap:12px; padding: 14px 20px 6px 20px; }
+  .back-btn{
+    width:34px; height:34px; border-radius:10px; border:none; background: var(--surface);
+    display:flex; align-items:center; justify-content:center;
+    box-shadow: 0 1px 0 var(--line); cursor:pointer; flex-shrink:0;
+  }
+  .back-btn svg{width:18px;height:18px;stroke:var(--forest-dark);}
+  .back-btn.hidden{ visibility:hidden; }
+
+  .hero{ padding: 6px 20px 22px 20px; }
+  .hero-badge{
+    display:inline-flex; align-items:center; gap:6px;
+    background: var(--forest); color:#F2E9D4;
+    font-size:11px; font-weight:700; letter-spacing:.08em; text-transform:uppercase;
+    padding:5px 10px; border-radius:999px;
+  }
+  .hero h1{ font-size: 26px; font-weight:800; letter-spacing:-0.02em; margin: 12px 0 4px 0; line-height:1.15; }
+  .hero p{ margin:0; color:var(--ink-soft); font-size:14.5px; line-height:1.4; max-width:32ch; }
+
+  .section-title{ padding: 4px 20px 10px 20px; }
+  .section-title h2{ font-size:19px; font-weight:800; letter-spacing:-0.01em; margin:0 0 3px 0; }
+  .section-title p{ margin:0; color:var(--ink-soft); font-size:13.5px; }
+
+  .tent-icon{ width:46px; height:38px; flex-shrink:0; }
+
+  .folder-list{ padding: 6px 16px 4px 16px; display:flex; flex-direction:column; gap:10px; }
+  .folder-card{
+    display:flex; align-items:center; gap:14px; background: var(--surface); border-radius:16px;
+    padding: 14px 16px; box-shadow: 0 1px 0 var(--line), 0 6px 16px -12px rgba(38,32,25,0.35);
+    cursor:pointer; border:1px solid var(--line); transition: transform .12s ease;
+  }
+  .folder-card:active{ transform: scale(0.98); }
+  .folder-card .meta{ flex:1; min-width:0; }
+  .folder-card .meta h3{ margin:0 0 3px 0; font-size:15.5px; font-weight:700; letter-spacing:-0.01em; }
+  .folder-card .meta span{ font-size:12.5px; color:var(--ink-soft); }
+  .folder-card .chev{ flex-shrink:0; opacity:.35; }
+  .folder-card .chev svg{ width:16px; height:16px; stroke:var(--ink); }
+
+  .count-pill{
+    display:inline-flex; align-items:center; justify-content:center;
+    min-width:20px; height:20px; padding:0 6px;
+    background: var(--bg); border:1px solid var(--line);
+    border-radius:999px; font-size:11px; font-weight:700; color:var(--ink-soft);
+    margin-left:8px;
+  }
+
+  .subfolder{ background: var(--surface); border:1px solid var(--line); border-radius:16px; margin: 0 16px 12px 16px; overflow:hidden; }
+  .subfolder-head{ display:flex; align-items:center; gap:12px; padding: 14px 16px; cursor:pointer; }
+  .subfolder-head h4{ margin:0; font-size:14.5px; font-weight:700; flex:1; letter-spacing:-0.005em; }
+  .subfolder-head .chev svg{ width:14px; height:14px; stroke:var(--ink-soft); transition: transform .18s ease; }
+  .subfolder-head.open .chev svg{ transform: rotate(90deg); }
+
+  .file-rows{ display:none; border-top:1px solid var(--line); }
+  .file-rows.open{ display:block; }
+
+  .file-row{
+    display:flex; align-items:center; gap:12px; padding: 12px 16px; border-top: 1px solid var(--line);
+    text-decoration:none; color:var(--ink);
+    background:none; border-left:none; border-right:none; border-bottom:none;
+    width:100%; text-align:left; font-family:inherit; cursor:pointer;
+  }
+  .file-row:first-child{ border-top:none; }
+  .file-row:active{ background: var(--bg); }
+
+  .file-badge{
+    width:34px; height:34px; border-radius:9px; display:flex; align-items:center; justify-content:center;
+    font-size:9.5px; font-weight:800; letter-spacing:.02em; color:#fff; flex-shrink:0;
+  }
+  .file-row .fname{ flex:1; font-size:13.5px; font-weight:600; line-height:1.3; }
+  .file-row .open-ico{ opacity:.4; flex-shrink:0; }
+  .file-row .open-ico svg{ width:15px; height:15px; stroke:var(--ink); }
+  .file-row .open-ico.spin svg{ animation: spin 0.9s linear infinite; }
+  @keyframes spin{ to{ transform:rotate(360deg); } }
+
+  .empty{
+    margin: 8px 16px 4px 16px; background: var(--surface); border:1px dashed var(--line);
+    border-radius:16px; padding: 30px 22px; text-align:center;
+  }
+  .empty .tent-icon{ margin: 0 auto 14px auto; opacity:.5; }
+  .empty h4{ margin:0 0 6px 0; font-size:15px; font-weight:700; }
+  .empty p{ margin:0; font-size:13px; color:var(--ink-soft); line-height:1.5; }
+
+  .footer-note{ padding: 18px 24px 6px 24px; text-align:center; font-size:11.5px; color:var(--ink-soft); opacity:.7; }
+
+  .view{ display:none; }
+  .view.active{ display:block; animation: fadein .18s ease; }
+  @keyframes fadein{ from{opacity:0; transform:translateY(4px);} to{opacity:1; transform:none;} }
+
+  /* ---------- gate (login) view ---------- */
+  #view-gate{ display:flex; flex-direction:column; min-height:88vh; padding: 0 24px; }
+  #view-gate.active{ display:flex; }
+  .gate-wrap{ margin:auto 0; text-align:center; padding: 20px 0 40px 0; }
+  .gate-wrap .tent-icon{ width:64px; height:52px; margin: 0 auto 18px auto; }
+  .gate-wrap h1{ font-size:22px; font-weight:800; letter-spacing:-0.02em; margin:0 0 8px 0; }
+  .gate-wrap p{ margin:0 0 22px 0; color:var(--ink-soft); font-size:14px; line-height:1.5; }
+  .gate-input{
+    width:100%; padding:14px 16px; border-radius:14px; border:1px solid var(--line);
+    background: var(--surface); font-size:15px; color:var(--ink); margin-bottom:12px;
+    font-family:inherit;
+  }
+  .gate-input:focus{ outline:none; border-color: var(--forest); }
+  .gate-btn{
+    width:100%; padding:14px 16px; border-radius:14px; border:none;
+    background: var(--forest); color:#F2E9D4; font-size:15px; font-weight:700;
+    cursor:pointer; font-family:inherit;
+  }
+  .gate-btn:active{ opacity:0.85; }
+  .gate-btn:disabled{ opacity:0.5; }
+  .gate-msg{ margin-top:14px; font-size:13px; line-height:1.5; min-height:18px; }
+  .gate-msg.error{ color: var(--danger); }
+  .gate-msg.loading{ color: var(--ink-soft); }
+
+  .modal-backdrop{
+    position:fixed; inset:0; background:rgba(20,16,10,0.72);
+    display:none; align-items:flex-end; justify-content:center; z-index:1000;
+  }
+  .modal-backdrop.open{ display:flex; }
+  .modal-sheet{
+    background: var(--forest-dark); width:100%; max-width:640px;
+    border-radius:20px 20px 0 0; padding: 14px 14px calc(18px + var(--safe-bottom)) 14px;
+    max-height:88vh; display:flex; flex-direction:column;
+  }
+  .modal-head{ display:flex; align-items:center; gap:10px; padding:6px 6px 12px 6px; }
+  .modal-head .fname{ flex:1; color:#F2E9D4; font-size:13.5px; font-weight:700; }
+  .modal-close{
+    width:30px; height:30px; border-radius:9px; border:none; background: rgba(255,255,255,0.1); color:#F2E9D4;
+    display:flex; align-items:center; justify-content:center; cursor:pointer;
+  }
+  .modal-close svg{ width:16px; height:16px; stroke:#F2E9D4; }
+  .modal-body{ flex:1; min-height:200px; border-radius:12px; overflow:hidden; background:#000; display:flex; align-items:center; justify-content:center; }
+  .modal-body video{ width:100%; max-height:70vh; display:block; }
+  .modal-body iframe{ width:100%; height:70vh; border:none; background:#fff; }
+  .modal-msg{ color:#F2E9D4; font-size:13px; text-align:center; padding:26px 18px; line-height:1.5; }
+  .modal-msg a{ color:var(--mustard); }
+
+  @media (prefers-reduced-motion: reduce){
+    .folder-card, .subfolder-head .chev svg, .view{ transition:none; animation:none; }
+  }
+</style>
+</head>
+<body>
+
+<div id="app">
+
+  <!-- ============ GATE VIEW (login by telegram nick) ============ -->
+  <div class="view active" id="view-gate">
+    <div class="gate-wrap">
+      <div id="gate-tent"></div>
+      <h1>Лагерь по Claude</h1>
+      <p>Материалы доступны только участникам потока<br>Введи свой ник в Telegram, чтобы войти</p>
+      <input class="gate-input" id="gate-input" type="text" placeholder="@твой_ник" autocomplete="off" autocapitalize="off">
+      <button class="gate-btn" id="gate-submit">Войти</button>
+      <div class="gate-msg" id="gate-msg"></div>
+    </div>
+  </div>
+
+  <!-- ============ HOME VIEW ============ -->
+  <div class="view" id="view-home">
+    <div class="topbar"><button class="back-btn hidden" aria-hidden="true"></button></div>
+    <div class="hero">
+      <span class="hero-badge">Лагерь по Claude</span>
+      <h1>Твой рюкзак с материалами</h1>
+      <p>Всё, что выдаётся на потоке - собрано в четырёх местах, открывай нужное</p>
+    </div>
+    <div class="folder-list" id="home-folder-list"></div>
+    <div class="footer-note">Материалы курса «ИИ на простом» - обновляются по ходу потока</div>
+  </div>
+
+  <!-- ============ SECTION VIEW ============ -->
+  <div class="view" id="view-section">
+    <div class="topbar">
+      <button class="back-btn" id="btn-back-section">
+        <svg viewBox="0 0 24 24" fill="none" stroke-width="2.4" stroke-linecap="round" stroke-linejoin="round"><path d="M15 18l-6-6 6-6"/></svg>
+      </button>
+    </div>
+    <div class="section-title" id="section-title-block">
+      <h2 id="section-title-text"></h2>
+      <p id="section-subtitle-text"></p>
+    </div>
+    <div id="section-body"></div>
+  </div>
+
+</div>
+
+<div class="modal-backdrop" id="modal-backdrop">
+  <div class="modal-sheet">
+    <div class="modal-head">
+      <div class="fname" id="modal-fname"></div>
+      <button class="modal-close" id="modal-close">
+        <svg viewBox="0 0 24 24" fill="none" stroke-width="2.4" stroke-linecap="round" stroke-linejoin="round"><path d="M6 6l12 12M18 6L6 18"/></svg>
+      </button>
+    </div>
+    <div class="modal-body" id="modal-body"></div>
+  </div>
+</div>
+
+<script>
+(function(){
+  var tg = window.Telegram ? window.Telegram.WebApp : null;
+  if (tg) {
+    tg.ready();
+    tg.expand();
+    try {
+      var tp = tg.themeParams || {};
+      var root = document.documentElement.style;
+      if (tp.bg_color) root.setProperty('--bg', tp.bg_color);
+      if (tp.secondary_bg_color) root.setProperty('--surface', tp.secondary_bg_color);
+      if (tp.text_color) root.setProperty('--ink', tp.text_color);
+      if (tp.hint_color) root.setProperty('--ink-soft', tp.hint_color);
+    } catch(e){}
+  }
+
+  // ---- сервер проверки участников (Google Apps Script) ----
+  var APPS_SCRIPT_URL = "https://script.google.com/macros/s/AKfycbzfxfN7f_-L9J1qmh2uQjyQlwksBaLYSlwSf5dE9DK7DmPUZO7OHEJ0Flk3rJO6vXFv/exec";
+  var STORAGE_KEY = "lager_claude_nick";
+
+  var DATA = null; // придёт с сервера только после проверки ника
+
+  function normalizeNick(v){
+    return (v || "").toString().trim().toLowerCase().replace(/^@/, "");
+  }
+
+  function fetchDirectLink(file){
+    var url = "https://cloud-api.yandex.net/v1/disk/public/resources/download"
+      + "?public_key=" + encodeURIComponent(file.publicKey);
+    return fetch(url).then(function(res){
+      if (!res.ok) throw new Error("yandex api status " + res.status);
+      return res.json();
+    }).then(function(data){
+      if (!data.href) throw new Error("no href in response");
+      return data.href;
+    });
+  }
+
+  var TYPE_COLORS = { pdf: "#B85C4A", video:"#2F4B3C", xlsx: "#3E7A55", docx: "#3E5C8A", link: "#8A6D3B" };
+  var TYPE_LABEL  = { pdf: "PDF", video: "MP4", xlsx: "XLS", docx: "DOC", link: "OPEN" };
+
+  function tentIcon(hex){
+    return '<svg class="tent-icon" viewBox="0 0 46 38" fill="none" xmlns="http://www.w3.org/2000/svg">'+
+      '<path d="M2 14 L23 2 L44 14" stroke="'+hex+'" stroke-width="3" stroke-linecap="round" stroke-linejoin="round" fill="none"/>'+
+      '<rect x="3" y="13" width="40" height="21" rx="5" fill="'+hex+'"/>'+
+      '<path d="M23 13 L23 34" stroke="rgba(0,0,0,0.14)" stroke-width="2"/>'+
+      '</svg>';
+  }
+  document.getElementById("gate-tent").innerHTML = tentIcon("var(--mustard)");
+
+  var COLOR_MAP = { mustard: "var(--mustard)", amber: "var(--amber)", forest: "var(--forest)", danger: "var(--danger)" };
+
+  function totalFiles(section){
+    var n = 0;
+    section.folders.forEach(function(f){ n += f.files.length; });
+    return n;
+  }
+
+  var viewGate = document.getElementById("view-gate");
+  var viewHome = document.getElementById("view-home");
+  var viewSection = document.getElementById("view-section");
+  var sectionBody = document.getElementById("section-body");
+  var homeList = document.getElementById("home-folder-list");
+
+  function renderHome(){
+    homeList.innerHTML = "";
+    DATA.forEach(function(section){
+      var hex = COLOR_MAP[section.color];
+      var count = totalFiles(section);
+      var card = document.createElement("div");
+      card.className = "folder-card";
+      card.innerHTML =
+        tentIcon(hex) +
+        '<div class="meta"><h3>'+section.title+(count ? '<span class="count-pill">'+count+'</span>' : '')+'</h3>'+
+        '<span>'+section.subtitle+'</span></div>'+
+        '<div class="chev"><svg viewBox="0 0 24 24" fill="none" stroke-width="2.4" stroke-linecap="round" stroke-linejoin="round"><path d="M9 6l6 6-6 6"/></svg></div>';
+      card.addEventListener("click", function(){ openSection(section); });
+      homeList.appendChild(card);
+    });
+  }
+
+  function openSection(section){
+    document.getElementById("section-title-text").textContent = section.title;
+    document.getElementById("section-subtitle-text").textContent = section.subtitle;
+    sectionBody.innerHTML = "";
+
+    if (section.folders.length === 0){
+      var hex = COLOR_MAP[section.color];
+      var empty = document.createElement("div");
+      empty.className = "empty";
+      empty.innerHTML = tentIcon(hex) + '<h4>Здесь пока пусто</h4><p>'+section.emptyText+'</p>';
+      sectionBody.appendChild(empty);
+    } else {
+      section.folders.forEach(function(folder, idx){
+        var wrap = document.createElement("div");
+        wrap.className = "subfolder";
+
+        var head = document.createElement("div");
+        head.className = "subfolder-head";
+        head.innerHTML = '<h4>'+folder.title+'</h4><span class="count-pill">'+folder.files.length+'</span>'+
+          '<div class="chev"><svg viewBox="0 0 24 24" fill="none" stroke-width="2.6" stroke-linecap="round" stroke-linejoin="round"><path d="M9 6l6 6-6 6"/></svg></div>';
+
+        var rows = document.createElement("div");
+        rows.className = "file-rows";
+        if (idx === 0){ rows.classList.add("open"); head.classList.add("open"); }
+
+        folder.files.forEach(function(file){
+          var row = document.createElement("button");
+          row.type = "button";
+          row.className = "file-row";
+          var bg = TYPE_COLORS[file.type] || "#7A6F5E";
+          row.innerHTML =
+            '<div class="file-badge" style="background:'+bg+'">'+TYPE_LABEL[file.type]+'</div>'+
+            '<div class="fname">'+file.name+'</div>'+
+            '<div class="open-ico"><svg viewBox="0 0 24 24" fill="none" stroke-width="2.2" stroke-linecap="round" stroke-linejoin="round"><path d="M7 17L17 7M9 7h8v8"/></svg></div>';
+          row.addEventListener("click", function(){ handleFileClick(file, row); });
+          rows.appendChild(row);
+        });
+
+        head.addEventListener("click", function(){
+          var isOpen = rows.classList.contains("open");
+          rows.classList.toggle("open", !isOpen);
+          head.classList.toggle("open", !isOpen);
+        });
+
+        wrap.appendChild(head);
+        wrap.appendChild(rows);
+        sectionBody.appendChild(wrap);
+      });
+    }
+
+    viewHome.classList.remove("active");
+    viewSection.classList.add("active");
+    if (tg && tg.BackButton){ tg.BackButton.show(); }
+  }
+
+  function goHome(){
+    viewSection.classList.remove("active");
+    viewHome.classList.add("active");
+    if (tg && tg.BackButton){ tg.BackButton.hide(); }
+  }
+
+  document.getElementById("btn-back-section").addEventListener("click", goHome);
+  if (tg && tg.BackButton){ tg.BackButton.onClick(goHome); }
+
+  var modalBackdrop = document.getElementById("modal-backdrop");
+  var modalBody = document.getElementById("modal-body");
+  var modalFname = document.getElementById("modal-fname");
+
+  function openModal(name){
+    modalFname.textContent = name;
+    modalBody.innerHTML = '<div class="modal-msg">Загружаю…</div>';
+    modalBackdrop.classList.add("open");
+  }
+  function closeModal(){
+    modalBackdrop.classList.remove("open");
+    modalBody.innerHTML = "";
+  }
+  document.getElementById("modal-close").addEventListener("click", closeModal);
+  modalBackdrop.addEventListener("click", function(e){ if (e.target === modalBackdrop) closeModal(); });
+
+  function handleFileClick(file, rowEl){
+    if (file.type === "link"){
+      if (tg && tg.openLink){ tg.openLink(file.url); } else { window.open(file.url, "_blank"); }
+      return;
+    }
+
+    var icoWrap = rowEl.querySelector(".open-ico");
+    icoWrap.classList.add("spin");
+
+    if (file.type === "video" || file.type === "pdf"){ openModal(file.name); }
+
+    fetchDirectLink(file).then(function(href){
+      icoWrap.classList.remove("spin");
+      if (file.type === "video"){
+        modalBody.innerHTML = "";
+        var v = document.createElement("video");
+        v.src = href; v.controls = true; v.playsInline = true; v.autoplay = true;
+        modalBody.appendChild(v);
+      } else if (file.type === "pdf"){
+        modalBody.innerHTML = '<iframe src="'+href+'"></iframe>';
+      } else {
+        var a = document.createElement("a");
+        a.href = href; a.download = file.name; a.rel = "noopener";
+        document.body.appendChild(a); a.click(); a.remove();
+      }
+    }).catch(function(err){
+      icoWrap.classList.remove("spin");
+      if (file.type === "video" || file.type === "pdf"){
+        modalBody.innerHTML = '<div class="modal-msg">Не получилось открыть файл напрямую<br><a href="'+file.publicKey+'" target="_blank" rel="noopener">Открыть файл на Диске</a></div>';
+      } else {
+        if (tg && tg.openLink){ tg.openLink(file.publicKey); } else { window.open(file.publicKey, "_blank"); }
+      }
+    });
+  }
+
+  // ---- gate logic ----
+  var gateInput = document.getElementById("gate-input");
+  var gateBtn = document.getElementById("gate-submit");
+  var gateMsg = document.getElementById("gate-msg");
+
+  function checkNick(nick, silent){
+    if (!silent){
+      gateBtn.disabled = true;
+      gateMsg.textContent = "Проверяю…";
+      gateMsg.className = "gate-msg loading";
+    }
+    var url = APPS_SCRIPT_URL + "?nick=" + encodeURIComponent(nick);
+    fetch(url).then(function(res){ return res.json(); }).then(function(data){
+      if (data.valid && data.materials){
+        DATA = data.materials;
+        try { localStorage.setItem(STORAGE_KEY, nick); } catch(e){}
+        renderHome();
+        viewGate.classList.remove("active");
+        viewHome.classList.add("active");
+      } else {
+        if (!silent){
+          gateMsg.textContent = "Не нашли тебя в списке участников - проверь ник или напиши организатору";
+          gateMsg.className = "gate-msg error";
+        }
+        gateBtn.disabled = false;
+      }
+    }).catch(function(err){
+      gateMsg.textContent = "Не получилось проверить - проверь связь с интернетом и попробуй ещё раз";
+      gateMsg.className = "gate-msg error";
+      gateBtn.disabled = false;
+    });
+  }
+
+  gateBtn.addEventListener("click", function(){
+    var nick = normalizeNick(gateInput.value);
+    if (!nick){
+      gateMsg.textContent = "Введи свой ник в Telegram";
+      gateMsg.className = "gate-msg error";
+      return;
+    }
+    checkNick(nick, false);
+  });
+  gateInput.addEventListener("keydown", function(e){ if (e.key === "Enter") gateBtn.click(); });
+
+  // авто-вход, если ник уже сохранён с прошлого раза
+  try {
+    var savedNick = localStorage.getItem(STORAGE_KEY);
+    if (savedNick){
+      gateMsg.textContent = "Проверяю…";
+      gateMsg.className = "gate-msg loading";
+      checkNick(savedNick, false);
+    }
+  } catch(e){}
+})();
+</script>
+</body>
+</html>
